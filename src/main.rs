@@ -1,3 +1,12 @@
+use clap::Parser;
+
+#[derive(Parser)]
+struct Args {
+    #[clap(short, long)]
+    private_key: String,
+}
+
 fn main() {
-    println!("Hello, world!");
+    let args = Args::parse();
+    println!("Private key: {}", args.private_key);
 }
