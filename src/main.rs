@@ -26,10 +26,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // try from wif, then try from hex
     let pk = key::parse_wif(&args.private_key).or_else(|_| key::parse_hex(&args.private_key))?;
+    let pk = pk.compressed(args.compressed).network(args.network);
+
     println!("Private key: {}", hex::encode(pk.private_key_bytes()));
     println!("Private key WIF: {}", pk.private_key_wif());
-
-    let pk = pk.compressed(args.compressed).network(args.network);
     println!("Public address: {}", pk.public_address()?);
 
     Ok(())
