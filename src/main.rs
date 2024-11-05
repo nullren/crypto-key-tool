@@ -95,27 +95,32 @@ impl PrivateKey {
     }
 
     fn public_key_bytes(&self) -> Vec<u8> {
-        let public_key = self.secret_key.public_key();
-        public_key
-            .to_encoded_point(self.compressed)
-            .as_bytes()
-            .to_vec()
+        public_key(&self.secret_key, self.compressed)
     }
 
     fn to_public_address(&self) -> Result<String, Box<dyn Error>> {
         let public_key = self.public_key_bytes();
-        let sha256_hash = Sha256::digest(&public_key);
-        let ripemd_hash = Ripemd160::digest(sha256_hash);
-        let mut address_bytes = vec![self.network.clone().into()];
-        address_bytes.extend(&ripemd_hash);
-        let checksum = {
-            let hash = Sha256::digest(&address_bytes);
-            let hash_of_hash = Sha256::digest(hash);
-            hash_of_hash[0..4].to_vec()
-        };
-        address_bytes.extend(checksum);
-        Ok(address_bytes.to_base58())
+        Ok(public_address(&public_key, self.network.clone()))
     }
+}
+
+fn public_key(secret_key: &SecretKey, compressed: bool) -> Vec<u8> {
+    let public_key = secret_key.public_key();
+    public_key.to_encoded_point(compressed).as_bytes().to_vec()
+}
+
+fn public_address(public_key: &[u8], network: Network) -> String {
+    let sha256_hash = Sha256::digest(public_key);
+    let ripemd_hash = Ripemd160::digest(sha256_hash);
+    let mut address_bytes = vec![network.into()];
+    address_bytes.extend(&ripemd_hash);
+    let checksum = {
+        let hash = Sha256::digest(&address_bytes);
+        let hash_of_hash = Sha256::digest(hash);
+        hash_of_hash[0..4].to_vec()
+    };
+    address_bytes.extend(checksum);
+    address_bytes.to_base58()
 }
 
 #[cfg(test)]
