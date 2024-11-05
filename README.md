@@ -19,3 +19,11 @@ Why would I want this? Well, a few reasons:
 - you have a key for testnet and want to use it in mainnet or vice versa
 
 Are they good reasons? Maybe not. It's not the most important piece of software.
+
+## Installation
+
+Install from crates.io, https://crates.io/crates/crypto-key-tool
+
+```bash
+cargo install crypto-key-tool
+```
