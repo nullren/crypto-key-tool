@@ -127,17 +127,28 @@ mod tests {
     }
 
     #[test]
-    // generated from https://www.bitaddress.org/
-    fn another_test() {
-        let pk = parse_wif("KxiqmRUoydWhCLACVYF4LQnq2BX6cbRyXh3FLZnUtfrgfi4JFEQ5");
-        assert!(pk.is_ok());
+    fn bitcoin_test() {
+        let test_cases = vec![
+            // generated from https://www.bitaddress.org/
+            ("KxiqmRUoydWhCLACVYF4LQnq2BX6cbRyXh3FLZnUtfrgfi4JFEQ5", "18tWySBE6Ceu6h7zQasvkAEZGb7Cf4qVEx"),
+            // copied from https://github.com/bitcoin/bitcoin/blob/master/src/test/key_tests.cpp
+            ("5HxWvvfubhXpYYpS3tJkw6fq9jE9j18THftkZjHHfmFiWtmAbrj", "1QFqqMUD55ZV3PJEJZtaKCsQmjLT6JkjvJ"),
+            ("5KC4ejrDjv152FGwP386VD1i2NYc5KkfSMyv1nGy1VGDxGHqVY3", "1F5y5E5FMc5YzdJtB9hLaUe43GDxEKXENJ"),
+            ("Kwr371tjA9u2rFSMZjTNun2PXXP3WPZu2afRHTcta6KxEUdm1vEw", "1NoJrossxPBKfCHuJXT4HadJrXRE9Fxiqs"),
+            ("L3Hq7a8FEQwJkW1M2GNKDW28546Vp5miewcCzSqUD9kCAXrJdS3g", "1CRj2HyM1CXWzHAXLQtiGLyggNT9WQqsDs"),
+        ];
 
-        let pk = pk.unwrap();
+        for (wif, addr) in test_cases {
+            let pk = parse_wif(wif);
+            assert!(pk.is_ok());
 
-        let public_addr = pk.public_address();
-        assert!(public_addr.is_ok());
+            let pk = pk.unwrap();
 
-        let public_addr = public_addr.unwrap();
-        assert_eq!(public_addr, "18tWySBE6Ceu6h7zQasvkAEZGb7Cf4qVEx");
+            let public_addr = pk.public_address();
+            assert!(public_addr.is_ok());
+
+            let public_addr = public_addr.unwrap();
+            assert_eq!(public_addr, addr);
+        }
     }
 }
