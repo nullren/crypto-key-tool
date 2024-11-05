@@ -1,12 +1,13 @@
 extern crate core;
 
-use clap::Parser;
-use k256::SecretKey;
-use std::error::Error;
 use base58::ToBase58;
+use clap::Parser;
 use k256::ecdsa::signature::digest::Digest;
+use k256::elliptic_curve::sec1::ToEncodedPoint;
+use k256::SecretKey;
 use ripemd::Ripemd160;
 use sha2::Sha256;
+use std::error::Error;
 
 #[derive(Parser)]
 struct Args {
@@ -20,38 +21,94 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn convert_to_private_key(private_key: &str) -> Result<SecretKey, Box<dyn Error>> {
-    // try as base58
-    if let Ok(bytes_b58) = base58::FromBase58::from_base58(private_key) {
-        let bytes = bytes_b58.as_slice();
-        if bytes.len() == 37 && bytes[0] == 0x80 {
-            return Ok(SecretKey::from_bytes(bytes[1..33].into())?);
-        }
-    }
-
-    // try as hex
-    let hex = hex::decode(private_key)?;
-    let bytes = hex.as_slice();
-    Ok(SecretKey::from_bytes(bytes.into())?)
+#[derive(Debug, Clone)]
+struct PrivateKey {
+    version: u8,
+    bytes: [u8; 32],
+    compression: bool,
+    checksum: [u8; 4],
+    secret_key: SecretKey,
 }
 
-fn convert_to_public_address(private_key: &SecretKey) -> Result<String, Box<dyn Error>> {
-    let public_key = private_key.public_key();
-    let sha256_hash = Sha256::digest(public_key.to_sec1_bytes());
-    let ripemd_hash = Ripemd160::digest(&sha256_hash);
-    
-    // Add version byte (0x00 for mainnet) and compute checksum
-    let mut address_bytes = vec![0x00];
-    address_bytes.extend(&ripemd_hash);
-    let checksum = {
-        let hash = Sha256::digest(&address_bytes);
-        let hash_of_hash = Sha256::digest(&hash);
-        hash_of_hash[0..4].to_vec()
-    };
-    address_bytes.extend(checksum);
+impl PrivateKey {
+    fn from_bytes(bytes: &[u8]) -> Result<Self, Box<dyn Error>> {
+        let bytes: [u8; 32] = bytes.try_into()?;
+        let secret_key = SecretKey::from_slice(&bytes).unwrap();
+        Ok(PrivateKey {
+            version: 0x80,
+            bytes,
+            compression: true,
+            checksum: [0u8; 4],
+            secret_key,
+        })
+    }
 
-    // Encode in Base58 to get the public address
-    Ok(address_bytes.to_base58())
+    fn from_wif(wif: &str) -> Result<Self, Box<dyn Error>> {
+        if let Ok(bytes_b58) = base58::FromBase58::from_base58(wif) {
+            let bytes = bytes_b58.as_slice();
+
+            let version = bytes[0];
+
+            let mut private_key = [0u8; 32];
+            private_key.copy_from_slice(&bytes[1..33]);
+
+            let len = bytes.len();
+            let compression = len == 38;
+
+            let mut checksum = [0u8; 4];
+            checksum.copy_from_slice(&bytes[len - 4..len]);
+
+            let checksum_hash = Sha256::digest(Sha256::digest(&bytes[0..len - 4]));
+            if checksum_hash[0..4] == checksum {
+                let secret_key = SecretKey::from_slice(&private_key).unwrap();
+                return Ok(PrivateKey {
+                    version,
+                    bytes: private_key,
+                    compression,
+                    checksum,
+                    secret_key,
+                });
+            }
+            return Err("Invalid checksum".into());
+        }
+        Err("Invalid WIF format".into())
+    }
+
+    fn public_key_bytes(&self) -> Vec<u8> {
+        let public_key = self.secret_key.public_key();
+        public_key
+            .to_encoded_point(self.compression)
+            .as_bytes()
+            .to_vec()
+    }
+
+    fn to_public_address(&self) -> Result<String, Box<dyn Error>> {
+        let public_key = self.public_key_bytes();
+        let sha256_hash = Sha256::digest(&public_key);
+        let ripemd_hash = Ripemd160::digest(sha256_hash);
+        // Add version byte (0x00 for mainnet) and compute checksum
+        let mut address_bytes = vec![0x00];
+        address_bytes.extend(&ripemd_hash);
+        let checksum = {
+            let hash = Sha256::digest(&address_bytes);
+            let hash_of_hash = Sha256::digest(hash);
+            hash_of_hash[0..4].to_vec()
+        };
+        address_bytes.extend(checksum);
+
+        // Encode in Base58 to get the public address
+        Ok(address_bytes.to_base58())
+    }
+}
+
+impl From<PrivateKey> for SecretKey {
+    fn from(private_key: PrivateKey) -> SecretKey {
+        SecretKey::from_bytes(&(private_key.bytes).into()).unwrap()
+    }
+}
+
+fn convert_to_private_key(private_key: &str) -> Result<SecretKey, Box<dyn Error>> {
+    PrivateKey::from_wif(private_key).map(|private_key| private_key.into())
 }
 
 mod tests {
@@ -70,14 +127,42 @@ mod tests {
     }
 
     #[test]
-    fn test_convert_to_public_address() {
-        let private_key = "5HxWvvfubhXpYYpS3tJkw6fq9jE9j18THftkZjHHfmFiWtmAbrj";
-        let secret_key = convert_to_private_key(private_key).unwrap();
-        let result = convert_to_public_address(&secret_key);
+    fn private_key_from_wif() {
+        let wif = "5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ";
+        let result = PrivateKey::from_wif(wif);
         assert!(result.is_ok());
+        let private_key = result.unwrap();
+        assert_eq!(private_key.version, 0x80);
         assert_eq!(
-            result.unwrap(),
-            "1QFqqMUD55ZV3PJEJZtaKCsQmjLT6JkjvJ".to_string()
+            hex::encode(private_key.bytes),
+            "0c28fca386c7a227600b2fe50b7cae11ec86d3bf1fbe471be89827e19d72aa1d"
         );
+        assert_eq!(private_key.compression, false);
+        assert_eq!(private_key.checksum, [80, 122, 91, 141]);
+    }
+
+    #[test]
+    fn private_key_to_public_address() {
+        let wif = "5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ";
+        let result = PrivateKey::from_wif(wif);
+        assert!(result.is_ok());
+
+        let public_key = result.unwrap().public_key_bytes();
+        println!("Public key bytes: {:?}", hex::encode(public_key));
+    }
+
+    #[test]
+    fn test_convert_to_public_address() {
+        let pk = PrivateKey::from_bytes(
+            &hex::decode("60cf347dbc59d31c1358c8e5cf5e45b822ab85b79cb32a9f3d98184779a9efc2")
+                .unwrap(),
+        )
+        .unwrap();
+
+        let public_addr = pk.to_public_address();
+        assert!(public_addr.is_ok());
+
+        let public_addr = public_addr.unwrap();
+        assert_eq!(public_addr, "17JsmEygbbEUEpvt4PFtYaTeSqfb9ki1F1");
     }
 }
