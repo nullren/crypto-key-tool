@@ -11,3 +11,10 @@ Options:
   -n, --network <NETWORK>          Which network to generate public address for [default: mainnet] [possible values: mainnet, testnet]
   -h, --help                       Print help
 ```
+
+Why would I want this? Well, a few reasons:
+- you have a raw private key and want to know the public address
+- you have a WIF key in an uncompressed format and want to convert it to a compressed format
+- you have a WIF key in a compressed format and want to convert it to an uncompressed format
+
+It's not the most important piece of software.
