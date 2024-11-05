@@ -27,13 +27,43 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 #[derive(Debug, Clone)]
 struct PrivateKey {
-    network: u8,
+    network: Network,
     compressed: bool,
     secret_key: SecretKey,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum Network {
+    Mainnet,
+    Testnet,
+}
+
+impl TryFrom<u8> for Network {
+    type Error = Box<dyn Error>;
+    fn try_from(byte: u8) -> Result<Self, Self::Error> {
+        match byte {
+            0x80 => Ok(Network::Mainnet),
+            0xef => Ok(Network::Testnet),
+            _ => Err("Invalid network byte".into()),
+        }
+    }
+}
+
+impl From<Network> for u8 {
+    fn from(network: Network) -> u8 {
+        match network {
+            Network::Mainnet => 0x00,
+            Network::Testnet => 0x6f,
+        }
+    }
+}
+
 impl PrivateKey {
-    fn from_bytes(network: u8, compressed: bool, bytes: &[u8]) -> Result<Self, Box<dyn Error>> {
+    fn from_bytes(
+        network: Network,
+        compressed: bool,
+        bytes: &[u8],
+    ) -> Result<Self, Box<dyn Error>> {
         let secret_key = SecretKey::from_slice(bytes)?;
         Ok(PrivateKey {
             network,
@@ -51,7 +81,7 @@ impl PrivateKey {
                 return Err("Invalid WIF length".into());
             }
             let compressed = len == 38;
-            let network = bytes[0];
+            let network = bytes[0].try_into()?;
             let private_key = &bytes[1..33];
             let checksum = &bytes[len - 4..len];
 
@@ -72,19 +102,11 @@ impl PrivateKey {
             .to_vec()
     }
 
-    fn network_byte(&self) -> u8 {
-        match self.network {
-            0x80 => 0x00,
-            0xef => 0x6f,
-            _ => 0x00,
-        }
-    }
-
     fn to_public_address(&self) -> Result<String, Box<dyn Error>> {
         let public_key = self.public_key_bytes();
         let sha256_hash = Sha256::digest(&public_key);
         let ripemd_hash = Ripemd160::digest(sha256_hash);
-        let mut address_bytes = vec![self.network_byte()];
+        let mut address_bytes = vec![self.network.clone().into()];
         address_bytes.extend(&ripemd_hash);
         let checksum = {
             let hash = Sha256::digest(&address_bytes);
@@ -106,7 +128,7 @@ mod tests {
         let result = PrivateKey::from_wif(wif);
         assert!(result.is_ok());
         let private_key = result.unwrap();
-        assert_eq!(private_key.network, 0x80);
+        assert_eq!(private_key.network, Network::Mainnet);
         assert_eq!(private_key.compressed, false);
     }
 
@@ -114,7 +136,7 @@ mod tests {
     // key from https://www.freecodecamp.org/news/how-to-create-a-bitcoin-wallet-address-from-a-private-key-eca3ddd9c05f/
     fn test_convert_to_public_address() {
         let pk = PrivateKey::from_bytes(
-            0x80,
+            Network::Mainnet,
             true,
             &hex::decode("60cf347dbc59d31c1358c8e5cf5e45b822ab85b79cb32a9f3d98184779a9efc2")
                 .unwrap(),
