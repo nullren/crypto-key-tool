@@ -16,7 +16,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
     let private_key = key::parse_wif(&args.private_key)?;
-    println!("Private key: {}", hex::encode(private_key.private_key_bytes()));
+    println!(
+        "Private key: {}",
+        hex::encode(private_key.private_key_bytes())
+    );
 
     Ok(())
 }
