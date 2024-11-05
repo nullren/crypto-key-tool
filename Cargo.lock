@@ -168,7 +168,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "crypto_key_tool"
+name = "crypto-key-tool"
 version = "0.1.0"
 dependencies = [
  "base58",
