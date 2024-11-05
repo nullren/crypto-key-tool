@@ -110,7 +110,6 @@ pub(crate) fn parse_hex(hex: &str) -> Result<PrivateKey, Box<dyn Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::network::Network;
 
     #[test]
     // key from https://www.freecodecamp.org/news/how-to-create-a-bitcoin-wallet-address-from-a-private-key-eca3ddd9c05f/
