@@ -19,28 +19,40 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
     let private_key = parse_wif(&args.private_key)?;
-    println!("Private key: {}", hex::encode(private_key.private_key_bytes()));
-    
-    for compressed in vec![true, false].iter() {
-        for network in vec![Network::Mainnet, Network::Testnet].iter() {
-            let wif = private_wif_key(&private_key.private_key_bytes(), &network, *compressed);
-            println!("Private compressed {} network {}: {}", compressed, network, wif);
+    println!(
+        "Private key: {}",
+        hex::encode(private_key.private_key_bytes())
+    );
 
-            let public_address = private_key.to_public_address(*compressed, &network)?;
-            println!("Public compressed {} network {}: {}", compressed, network, public_address);
+    for compressed in [true, false].iter() {
+        for network in [Network::Mainnet, Network::Testnet].iter() {
+            let wif = private_wif_key(&private_key.private_key_bytes(), network, *compressed);
+            println!(
+                "Private compressed {} network {}: {}",
+                compressed, network, wif
+            );
+
+            let public_address = private_key.to_public_address(*compressed, network)?;
+            println!(
+                "Public compressed {} network {}: {}",
+                compressed, network, public_address
+            );
         }
     }
-    
+
     Ok(())
 }
 
 #[derive(Debug, Clone)]
 struct PrivateKey {
+    network: Network,
+    compressed: bool,
     secret_key: SecretKey,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, clap::ValueEnum)]
+#[derive(Default, Debug, Clone, Eq, PartialEq, clap::ValueEnum)]
 enum Network {
+    #[default]
     Mainnet,
     Testnet,
 }
@@ -82,10 +94,14 @@ impl Network {
 
 impl PrivateKey {
     fn from_slice(
+        network: Network,
+        compressed: bool,
         bytes: &[u8],
     ) -> Result<Self, Box<dyn Error>> {
         let secret_key = SecretKey::from_slice(bytes)?;
         Ok(PrivateKey {
+            network,
+            compressed,
             secret_key,
         })
     }
@@ -93,12 +109,16 @@ impl PrivateKey {
     fn public_key_bytes(&self, compressed: bool) -> Vec<u8> {
         public_key(&self.secret_key, compressed)
     }
-    
+
     fn private_key_bytes(&self) -> Vec<u8> {
         self.secret_key.to_bytes().to_vec()
     }
 
-    fn to_public_address(&self, compressed: bool, network: &Network) -> Result<String, Box<dyn Error>> {
+    fn to_public_address(
+        &self,
+        compressed: bool,
+        network: &Network,
+    ) -> Result<String, Box<dyn Error>> {
         let public_key = self.public_key_bytes(compressed);
         Ok(public_address(&public_key, network))
     }
@@ -115,12 +135,15 @@ fn parse_wif(wif: &str) -> Result<PrivateKey, Box<dyn Error>> {
                 return Err("Invalid WIF length".into());
             }
 
+            let network = Network::try_from(bytes[0])?;
+            let compressed = len == 38;
+
             if !verify_checksum(bytes) {
                 return Err("Invalid checksum".into());
             }
 
             let private_key = &bytes[1..33];
-            PrivateKey::from_slice(private_key)
+            PrivateKey::from_slice(network, compressed, private_key)
         }
     }
 }
@@ -170,6 +193,8 @@ mod tests {
     // key from https://www.freecodecamp.org/news/how-to-create-a-bitcoin-wallet-address-from-a-private-key-eca3ddd9c05f/
     fn test_convert_to_public_address() {
         let pk = PrivateKey::from_slice(
+            Default::default(),
+            Default::default(),
             &hex::decode("60cf347dbc59d31c1358c8e5cf5e45b822ab85b79cb32a9f3d98184779a9efc2")
                 .unwrap(),
         )
