@@ -36,7 +36,7 @@ impl PrivateKey {
         Self { network, ..self }
     }
 
-    fn public_key(&self) -> Vec<u8> {
+    fn public_key_bytes(&self) -> Vec<u8> {
         let public_key = self.secret_key.public_key();
         public_key
             .to_encoded_point(self.compressed)
@@ -44,13 +44,13 @@ impl PrivateKey {
             .to_vec()
     }
 
-    pub(crate) fn private_key(&self) -> Vec<u8> {
+    pub(crate) fn private_key_bytes(&self) -> Vec<u8> {
         self.secret_key.to_bytes().to_vec()
     }
 
     fn public_address(&self) -> Result<String, Box<dyn Error>> {
         // this handles the "compression"
-        let public_key = self.public_key();
+        let public_key = self.public_key_bytes();
 
         let mut data = vec![self.network.public_byte()];
 
@@ -65,7 +65,7 @@ impl PrivateKey {
 
     fn export_private_wif_key(self) -> String {
         let mut wif_bytes = vec![self.network.private_byte()];
-        wif_bytes.extend(self.private_key());
+        wif_bytes.extend(self.private_key_bytes());
         if self.compressed {
             wif_bytes.push(0x01);
         }

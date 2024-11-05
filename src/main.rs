@@ -3,7 +3,6 @@ mod checksum;
 mod key;
 mod network;
 
-use crate::key::parse_wif;
 use clap::Parser;
 use std::error::Error;
 
@@ -16,8 +15,8 @@ struct Args {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
-    let private_key = parse_wif(&args.private_key)?;
-    println!("Private key: {}", hex::encode(private_key.private_key()));
+    let private_key = key::parse_wif(&args.private_key)?;
+    println!("Private key: {}", hex::encode(private_key.private_key_bytes()));
 
     Ok(())
 }
