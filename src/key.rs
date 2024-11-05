@@ -59,8 +59,7 @@ impl PrivateKey {
         let hash = Ripemd160::digest(&hash);
         data.extend_from_slice(&hash);
 
-        let checksum = checksum::digest(&data);
-        data.extend_from_slice(&checksum);
+        checksum::append_to(&mut data);
         Ok(ToBase58::to_base58(&*data))
     }
 
@@ -70,8 +69,7 @@ impl PrivateKey {
         if self.compressed {
             wif_bytes.push(0x01);
         }
-        let checksum = checksum::digest(&wif_bytes);
-        wif_bytes.extend_from_slice(&checksum);
+        checksum::append_to(&mut wif_bytes);
         ToBase58::to_base58(&*wif_bytes)
     }
 }
@@ -111,11 +109,10 @@ mod tests {
     #[test]
     // key from https://www.freecodecamp.org/news/how-to-create-a-bitcoin-wallet-address-from-a-private-key-eca3ddd9c05f/
     fn test_convert_to_public_address() {
-        let secret_key = SecretKey::from_slice(
-            &hex::decode("60cf347dbc59d31c1358c8e5cf5e45b822ab85b79cb32a9f3d98184779a9efc2")
-                .unwrap(),
-        )
-        .unwrap();
+        let key_bytes =
+            hex::decode("60cf347dbc59d31c1358c8e5cf5e45b822ab85b79cb32a9f3d98184779a9efc2")
+                .unwrap();
+        let secret_key = SecretKey::from_slice(&key_bytes).unwrap();
         let pk = PrivateKey::new(secret_key)
             .compressed(true)
             .network(Network::Mainnet);
