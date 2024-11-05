@@ -18,4 +18,4 @@ Why would I want this? Well, a few reasons:
 - you have a WIF key in a compressed format and want to convert it to an uncompressed format
 - you have a key for testnet and want to use it in mainnet or vice versa
 
-It's not the most important piece of software.
+Are they good reasons? Maybe not. It's not the most important piece of software.
