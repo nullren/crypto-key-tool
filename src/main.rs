@@ -1,6 +1,12 @@
+extern crate core;
+
 use clap::Parser;
 use k256::SecretKey;
 use std::error::Error;
+use base58::ToBase58;
+use k256::ecdsa::signature::digest::Digest;
+use ripemd::Ripemd160;
+use sha2::Sha256;
 
 #[derive(Parser)]
 struct Args {
@@ -29,8 +35,23 @@ fn convert_to_private_key(private_key: &str) -> Result<SecretKey, Box<dyn Error>
     Ok(SecretKey::from_bytes(bytes.into())?)
 }
 
-fn convert_to_public_address(_private_key: &SecretKey) -> Result<String, Box<dyn Error>> {
-    todo!()
+fn convert_to_public_address(private_key: &SecretKey) -> Result<String, Box<dyn Error>> {
+    let public_key = private_key.public_key();
+    let sha256_hash = Sha256::digest(public_key.to_sec1_bytes());
+    let ripemd_hash = Ripemd160::digest(&sha256_hash);
+    
+    // Add version byte (0x00 for mainnet) and compute checksum
+    let mut address_bytes = vec![0x00];
+    address_bytes.extend(&ripemd_hash);
+    let checksum = {
+        let hash = Sha256::digest(&address_bytes);
+        let hash_of_hash = Sha256::digest(&hash);
+        hash_of_hash[0..4].to_vec()
+    };
+    address_bytes.extend(checksum);
+
+    // Encode in Base58 to get the public address
+    Ok(address_bytes.to_base58())
 }
 
 mod tests {
