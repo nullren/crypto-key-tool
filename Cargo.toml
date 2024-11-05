@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 description = "A tool for interacting with bitcoin keys and addresses"
+repository = "https://github.com/nullren/crypto-key-tool"
 
 [dependencies]
 base58 = "0.2.0"
