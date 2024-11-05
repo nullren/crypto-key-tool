@@ -20,7 +20,7 @@ pub(crate) struct PrivateKey {
 }
 
 impl PrivateKey {
-    fn new(secret_key: SecretKey) -> Self {
+    pub(crate) fn new(secret_key: SecretKey) -> Self {
         Self {
             network: Default::default(),
             compressed: Default::default(),
@@ -28,15 +28,15 @@ impl PrivateKey {
         }
     }
 
-    fn compressed(self, compressed: bool) -> Self {
+    pub(crate) fn compressed(self, compressed: bool) -> Self {
         Self { compressed, ..self }
     }
 
-    fn network(self, network: Network) -> Self {
+    pub(crate) fn network(self, network: Network) -> Self {
         Self { network, ..self }
     }
 
-    fn public_key_bytes(&self) -> Vec<u8> {
+    pub(crate) fn public_key_bytes(&self) -> Vec<u8> {
         let public_key = self.secret_key.public_key();
         public_key
             .to_encoded_point(self.compressed)
@@ -48,7 +48,7 @@ impl PrivateKey {
         self.secret_key.to_bytes().to_vec()
     }
 
-    fn public_address(&self) -> Result<String, Box<dyn Error>> {
+    pub(crate) fn public_address(&self) -> Result<String, Box<dyn Error>> {
         // this handles the "compression"
         let public_key = self.public_key_bytes();
 
@@ -56,14 +56,14 @@ impl PrivateKey {
 
         // hash the public key
         let hash = Sha256::digest(&public_key);
-        let hash = Ripemd160::digest(&hash);
+        let hash = Ripemd160::digest(hash);
         data.extend_from_slice(&hash);
 
         checksum::append_to(&mut data);
         Ok(ToBase58::to_base58(&*data))
     }
 
-    fn export_private_wif_key(self) -> String {
+    pub(crate) fn private_key_wif(&self) -> String {
         let mut wif_bytes = vec![self.network.private_byte()];
         wif_bytes.extend(self.private_key_bytes());
         if self.compressed {
@@ -101,6 +101,12 @@ pub(crate) fn parse_wif(wif: &str) -> Result<PrivateKey, Box<dyn Error>> {
     }
 }
 
+pub(crate) fn parse_hex(hex: &str) -> Result<PrivateKey, Box<dyn Error>> {
+    let bytes = hex::decode(hex)?;
+    let secret_key = SecretKey::from_slice(&bytes)?;
+    Ok(PrivateKey::new(secret_key))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,13 +115,10 @@ mod tests {
     #[test]
     // key from https://www.freecodecamp.org/news/how-to-create-a-bitcoin-wallet-address-from-a-private-key-eca3ddd9c05f/
     fn test_convert_to_public_address() {
-        let key_bytes =
-            hex::decode("60cf347dbc59d31c1358c8e5cf5e45b822ab85b79cb32a9f3d98184779a9efc2")
-                .unwrap();
-        let secret_key = SecretKey::from_slice(&key_bytes).unwrap();
-        let pk = PrivateKey::new(secret_key)
-            .compressed(true)
-            .network(Network::Mainnet);
+        let pk = parse_hex("60cf347dbc59d31c1358c8e5cf5e45b822ab85b79cb32a9f3d98184779a9efc2");
+        assert!(pk.is_ok());
+
+        let pk = pk.unwrap().compressed(true).network(Network::Mainnet);
 
         let public_addr = pk.public_address();
         assert!(public_addr.is_ok());
@@ -129,6 +132,7 @@ mod tests {
     fn another_test() {
         let pk = parse_wif("KxiqmRUoydWhCLACVYF4LQnq2BX6cbRyXh3FLZnUtfrgfi4JFEQ5");
         assert!(pk.is_ok());
+
         let pk = pk.unwrap();
 
         let public_addr = pk.public_address();

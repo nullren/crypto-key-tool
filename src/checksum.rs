@@ -13,6 +13,6 @@ pub(crate) fn verify(data: &[u8]) -> bool {
 }
 
 pub(crate) fn append_to(bytes: &mut Vec<u8>) {
-    let checksum = digest(&bytes);
+    let checksum = digest(bytes);
     bytes.extend_from_slice(&checksum);
 }
