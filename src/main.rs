@@ -18,27 +18,31 @@ struct Args {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     println!("Private key: {}", args.private_key);
+
+    let private_key = PrivateKey::from_wif(&args.private_key)
+        .or_else(|_| PrivateKey::from_hex(&args.private_key))?;
+    let public_address = private_key.to_public_address()?;
+    println!("Public address: {}", public_address);
     Ok(())
 }
 
 #[derive(Debug, Clone)]
 struct PrivateKey {
-    version: u8,
+    network: u8,
     bytes: [u8; 32],
     compression: bool,
-    checksum: [u8; 4],
     secret_key: SecretKey,
 }
 
 impl PrivateKey {
-    fn from_bytes(bytes: &[u8]) -> Result<Self, Box<dyn Error>> {
-        let bytes: [u8; 32] = bytes.try_into()?;
+    fn from_hex(bytes: &str) -> Result<Self, Box<dyn Error>> {
+        let bytes = hex::decode(bytes)?;
+        let bytes: [u8; 32] = bytes.as_slice().try_into()?;
         let secret_key = SecretKey::from_slice(&bytes).unwrap();
         Ok(PrivateKey {
-            version: 0x80,
+            network: 0x80,
             bytes,
             compression: true,
-            checksum: [0u8; 4],
             secret_key,
         })
     }
@@ -47,7 +51,7 @@ impl PrivateKey {
         if let Ok(bytes_b58) = base58::FromBase58::from_base58(wif) {
             let bytes = bytes_b58.as_slice();
 
-            let version = bytes[0];
+            let network = bytes[0];
 
             let mut private_key = [0u8; 32];
             private_key.copy_from_slice(&bytes[1..33]);
@@ -62,10 +66,9 @@ impl PrivateKey {
             if checksum_hash[0..4] == checksum {
                 let secret_key = SecretKey::from_slice(&private_key).unwrap();
                 return Ok(PrivateKey {
-                    version,
+                    network,
                     bytes: private_key,
                     compression,
-                    checksum,
                     secret_key,
                 });
             }
@@ -82,12 +85,20 @@ impl PrivateKey {
             .to_vec()
     }
 
+    fn network_byte(&self) -> u8 {
+        match self.network {
+            0x80 => 0x00,
+            0xef => 0x6f,
+            _ => 0x00,
+        }
+    }
+
     fn to_public_address(&self) -> Result<String, Box<dyn Error>> {
         let public_key = self.public_key_bytes();
         let sha256_hash = Sha256::digest(&public_key);
         let ripemd_hash = Ripemd160::digest(sha256_hash);
         // Add version byte (0x00 for mainnet) and compute checksum
-        let mut address_bytes = vec![0x00];
+        let mut address_bytes = vec![self.network_byte()];
         address_bytes.extend(&ripemd_hash);
         let checksum = {
             let hash = Sha256::digest(&address_bytes);
@@ -107,24 +118,9 @@ impl From<PrivateKey> for SecretKey {
     }
 }
 
-fn convert_to_private_key(private_key: &str) -> Result<SecretKey, Box<dyn Error>> {
-    PrivateKey::from_wif(private_key).map(|private_key| private_key.into())
-}
-
+#[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_convert_to_private_key() {
-        let private_key = "5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ";
-        let result = convert_to_private_key(private_key);
-        assert!(result.is_ok());
-        let private_key = result.unwrap();
-        assert_eq!(
-            hex::encode(private_key.to_bytes()),
-            "0c28fca386c7a227600b2fe50b7cae11ec86d3bf1fbe471be89827e19d72aa1d"
-        );
-    }
 
     #[test]
     fn private_key_from_wif() {
@@ -132,13 +128,12 @@ mod tests {
         let result = PrivateKey::from_wif(wif);
         assert!(result.is_ok());
         let private_key = result.unwrap();
-        assert_eq!(private_key.version, 0x80);
+        assert_eq!(private_key.network, 0x80);
         assert_eq!(
             hex::encode(private_key.bytes),
             "0c28fca386c7a227600b2fe50b7cae11ec86d3bf1fbe471be89827e19d72aa1d"
         );
         assert_eq!(private_key.compression, false);
-        assert_eq!(private_key.checksum, [80, 122, 91, 141]);
     }
 
     #[test]
@@ -153,9 +148,8 @@ mod tests {
 
     #[test]
     fn test_convert_to_public_address() {
-        let pk = PrivateKey::from_bytes(
-            &hex::decode("60cf347dbc59d31c1358c8e5cf5e45b822ab85b79cb32a9f3d98184779a9efc2")
-                .unwrap(),
+        let pk = PrivateKey::from_hex(
+            "60cf347dbc59d31c1358c8e5cf5e45b822ab85b79cb32a9f3d98184779a9efc2",
         )
         .unwrap();
 
