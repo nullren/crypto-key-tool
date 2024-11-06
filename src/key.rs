@@ -107,6 +107,20 @@ pub(crate) fn parse_hex(hex: &str) -> Result<PrivateKey, Box<dyn Error>> {
     Ok(PrivateKey::new(secret_key))
 }
 
+pub(crate) fn parse_mpkf(mpkf: &str) -> Result<PrivateKey, Box<dyn Error>> {
+    // verify it's a valid mini private key format
+    if mpkf.len() != 30 {
+        return Err("Invalid mini private key format".into());
+    }
+    let test = Sha256::digest(format!("{}?", mpkf));
+    if test[0] != 0 {
+        return Err("Invalid mini private key format".into());
+    }
+    let pk_bytes = Sha256::digest(mpkf);
+    let secret_key = SecretKey::from_slice(&pk_bytes)?;
+    Ok(PrivateKey::new(secret_key))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,5 +179,15 @@ mod tests {
             let public_addr = public_addr.unwrap();
             assert_eq!(public_addr, addr);
         }
+    }
+
+    #[test]
+    fn test_mini_private_key_format() {
+        let pk = parse_mpkf("S6c56bnXQiBjk9mqSYE7ykVQ7NzrRy");
+        assert!(pk.is_ok());
+        let pk = pk.unwrap();
+        let public_addr = pk.public_address();
+        assert!(public_addr.is_ok());
+        assert_eq!(public_addr.unwrap(), "1CciesT23BNionJeXrbxmjc7ywfiyM4oLW");
     }
 }
