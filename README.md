@@ -14,6 +14,7 @@ Options:
 
 Why would I want this? Well, a few reasons:
 - you have a raw private key and want to know the public address
+- you have a mini private key and want to know the WIF key
 - you have a WIF key in an uncompressed format and want to convert it to a compressed format
 - you have a WIF key in a compressed format and want to convert it to an uncompressed format
 - you have a key for testnet and want to use it in mainnet or vice versa
