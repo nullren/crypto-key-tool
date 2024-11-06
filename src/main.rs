@@ -8,7 +8,7 @@ use std::error::Error;
 
 #[derive(Parser)]
 struct Args {
-    /// The private key to parse must be in either WIF format or a raw key in hex.
+    /// The private key to parse must be in either mini private key format, WIF, or a raw key in hex.
     #[clap(short, long)]
     private_key: String,
 

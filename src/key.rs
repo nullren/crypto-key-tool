@@ -109,7 +109,7 @@ pub(crate) fn parse_hex(hex: &str) -> Result<PrivateKey, Box<dyn Error>> {
 
 pub(crate) fn parse_mpkf(mpkf: &str) -> Result<PrivateKey, Box<dyn Error>> {
     // verify it's a valid mini private key format
-    if mpkf.len() != 30 {
+    if mpkf.len() != 30 && mpkf.len() != 22 {
         return Err("Invalid mini private key format".into());
     }
     let test = Sha256::digest(format!("{}?", mpkf));
