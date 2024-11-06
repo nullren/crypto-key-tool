@@ -24,8 +24,10 @@ struct Args {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
-    // try from wif, then try from hex
-    let pk = key::parse_wif(&args.private_key).or_else(|_| key::parse_hex(&args.private_key))?;
+    // first try mini private key format, then WIF, then hex
+    let pk = key::parse_mpkf(&args.private_key)
+        .or_else(|_| key::parse_wif(&args.private_key))
+        .or_else(|_| key::parse_hex(&args.private_key))?;
     let pk = pk.compressed(args.compressed).network(args.network);
 
     println!("Private key: {}", hex::encode(pk.private_key_bytes()));
